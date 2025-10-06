@@ -1,77 +1,38 @@
-const Email = require('email-templates');
-const nodemailer = require('nodemailer');
-const { emailConfig } = require('../../../config/vars');
+/* eslint-disable camelcase */
+const axios = require('axios');
+const sgMail = require('@sendgrid/mail');
+const randomstring = require('randomstring');
 
-// SMTP is the main transport in Nodemailer for delivering messages.
-// SMTP is also the protocol used between almost all email hosts, so its truly universal.
-// if you dont want to use SMTP you can create your own transport here
-// such as an email service API or nodemailer-sendgrid-transport
-
-const transporter = nodemailer.createTransport({
-  port: emailConfig.port,
-  host: emailConfig.host,
-  auth: {
-    user: emailConfig.username,
-    pass: emailConfig.password,
-  },
-  secure: false, // upgrades later with STARTTLS -- change this based on the PORT
-});
-
-// verify connection configuration
-transporter.verify((error) => {
-  if (error) {
-    console.log('error with email connection');
-  }
-});
-
-exports.sendPasswordReset = async (passwordResetObject) => {
-  const email = new Email({
-    views: { root: __dirname },
-    message: {
-      from: 'support@your-app.com',
-    },
-    // uncomment below to send emails in development/test env:
-    send: true,
-    transport: transporter,
-  });
-
-  email
-    .send({
-      template: 'passwordReset',
-      message: {
-        to: passwordResetObject.userEmail,
-      },
-      locals: {
-        productName: 'Test App',
-        // passwordResetUrl should be a URL to your app that displays a view where they
-        // can enter a new password along with passing the resetToken in the params
-        passwordResetUrl: `https://your-app/new-password/view?resetToken=${passwordResetObject.resetToken}`,
-      },
-    })
-    .catch(() => console.log('error sending password reset email'));
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+exports.facebook = async (access_token) => {
+  const fields = 'id, name, email, picture';
+  const url = 'https://graph.facebook.com/me';
+  const params = { access_token, fields };
+  const response = await axios.get(url, { params });
+  const {
+    id, name, email, picture,
+  } = response.data;
+  return {
+    service: 'facebook',
+    picture: picture.data.url,
+    id,
+    name,
+    email,
+  };
 };
 
-exports.sendPasswordChangeEmail = async (user) => {
-  const email = new Email({
-    views: { root: __dirname },
-    message: {
-      from: 'support@your-app.com',
-    },
-    // uncomment below to send emails in development/test env:
-    send: true,
-    transport: transporter,
-  });
+exports.randomStr = () => randomstring.generate(10);
 
-  email
-    .send({
-      template: 'passwordChange',
-      message: {
-        to: user.email,
-      },
-      locals: {
-        productName: 'Test App',
-        name: user.name,
-      },
-    })
-    .catch(() => console.log('error sending change password email'));
+exports.send_email = async (to, subject, html) => {
+  const msg = {
+    to,
+    from: 'Alcamy <support@alcamy.com>',
+    subject,
+    html,
+  };
+  sgMail.send(msg, (err) => {
+    if (err) {
+      console.log(err);
+    }
+  });
 };
